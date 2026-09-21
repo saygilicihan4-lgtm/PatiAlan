@@ -101,12 +101,45 @@ function json(body: unknown, status = 200) {
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
-  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+  const corsHeaders = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "content-type, authorization, apikey, x-client-info",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+  };
 
-  const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
-  const secret = secretKeys.default ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  if (!secret || !supabaseUrl) return json({ error: "backend_not_configured" }, 500);
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // The public landing page must render even if database/admin initialization fails.
+  if (req.method === "GET" && url.searchParams.get("health") !== "1") {
+    return new Response(html, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=60",
+      },
+    });
+  }
+
+  let secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!secret) {
+    try {
+      const rawSecrets = Deno.env.get("SUPABASE_SECRET_KEYS");
+      if (rawSecrets) secret = JSON.parse(rawSecrets).default ?? "";
+    } catch (error) {
+      console.error("secret_key_parse_failed", error);
+    }
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  if (!secret || !supabaseUrl) {
+    return new Response(JSON.stringify({ error: "backend_not_configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+    });
+  }
 
   const admin = createClient(supabaseUrl, secret, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -114,13 +147,27 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "GET" && url.searchParams.get("health") === "1") {
     const { count, error } = await admin.from("pilot_leads").select("id", { count: "exact", head: true });
-    return json({ ok: !error, service: "patialan-live-pilot", leads: count ?? 0, database: error ? "error" : "ok" }, error ? 500 : 200);
+    return new Response(JSON.stringify({
+      ok: !error,
+      service: "patialan-live-pilot",
+      leads: count ?? 0,
+      database: error ? "error" : "ok",
+    }), {
+      status: error ? 500 : 200,
+      headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
   }
 
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      if (body.company) return json({ ok: true });
+      if (body.company) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
       const kind = body.kind === "host" ? "host" : body.kind === "guest" ? "guest" : null;
       const name = String(body.name ?? "").trim().slice(0, 120);
       const email = String(body.email ?? "").trim().toLowerCase().slice(0, 240);
@@ -128,24 +175,52 @@ Deno.serve(async (req: Request) => {
       const district = String(body.district ?? "").trim().slice(0, 100) || null;
       const areaM2 = body.area_m2 == null ? null : Number(body.area_m2);
 
-      if (!kind || name.length < 2 || !email.includes("@")) return json({ error: "Geçersiz form." }, 400);
-      if (areaM2 !== null && (!Number.isInteger(areaM2) || areaM2 <= 0 || areaM2 > 10000000)) return json({ error: "Alan büyüklüğü geçersiz." }, 400);
+      if (!kind || name.length < 2 || !email.includes("@")) {
+        return new Response(JSON.stringify({ error: "Geçersiz form." }), {
+          status: 400,
+          headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
+      if (areaM2 !== null && (!Number.isInteger(areaM2) || areaM2 <= 0 || areaM2 > 10000000)) {
+        return new Response(JSON.stringify({ error: "Alan büyüklüğü geçersiz." }), {
+          status: 400,
+          headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+        });
+      }
 
       const { error } = await admin.from("pilot_leads").insert({
-        kind, name, email, phone, district, area_m2: areaM2, source: "edge_pilot"
+        kind,
+        name,
+        email,
+        phone,
+        district,
+        area_m2: areaM2,
+        source: "edge_pilot",
       });
+
       if (error) {
         console.error("pilot_lead_insert_failed", error);
-        return json({ error: "Kayıt alınamadı." }, 500);
+        return new Response(JSON.stringify({ error: "Kayıt alınamadı." }), {
+          status: 500,
+          headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+        });
       }
-      return json({ ok: true }, 201);
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 201,
+        headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+      });
     } catch {
-      return json({ error: "Geçersiz istek." }, 400);
+      return new Response(JSON.stringify({ error: "Geçersiz istek." }), {
+        status: 400,
+        headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+      });
     }
   }
 
-  return new Response(html, {
-    status: 200,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
+  return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+    status: 405,
+    headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
   });
 });
