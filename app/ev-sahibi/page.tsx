@@ -1,0 +1,4 @@
+import Link from "next/link";
+export default function HostPage() {
+  return <section className="hero hostHero"><div className="heroCopy"><span className="eyebrow">PatiAlan ev sahibi</span><h1>Boş alanını<br/><em>gelire dönüştür.</em></h1><p>Bahçeni, çiftlik alanını veya köpeklere uygun tesisindeki boş saatleri güvenli rezervasyonlarla değerlendir.</p><div className="heroActions"><Link className="primary" href="/ev-sahibi/yeni">Alanımı ekle</Link></div><div className="hostFacts"><div><strong>%18</strong><span>planlanan platform komisyonu</span></div><div><strong>0 TL</strong><span>pilot dönem listeleme ücreti</span></div><div><strong>7/24</strong><span>takvim kontrolü</span></div></div></div><div className="heroPanel hostPanel"><h3>Yayın öncesi kontrol</h3><ul><li>Kimlik ve telefon doğrulama</li><li>Alan kullanım hakkı beyanı</li><li>Kapı + çit video kontrolü</li><li>Güncel fotoğraflar</li><li>Acil durum bilgileri</li></ul></div></section>;
+}
