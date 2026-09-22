@@ -6,7 +6,9 @@ Türkiye için **Private Pet Spaces** pazaryeri MVP'si. İlk pilot İstanbul'da 
 
 Public pilot landing + ön kayıt:
 
-https://cretwntzhnfzypujqlid.supabase.co/functions/v1/patialan-app
+https://saygilicihan4-lgtm.github.io/PatiAlan/
+
+Form API backend: Supabase Edge Function (`patialan-app`).
 
 > Canlı pilot sayfasındaki alan kartları ürün deneyimini göstermek için örnektir. Ücretli rezervasyonlar gerçek alan doğrulaması ve ödeme entegrasyonu tamamlanmadan açılmayacaktır.
 
