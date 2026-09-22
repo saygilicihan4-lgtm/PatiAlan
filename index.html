@@ -78,7 +78,7 @@ document.querySelectorAll('form[data-kind]').forEach(form=>{
   if(body.area_m2) body.area_m2=Number(body.area_m2); else delete body.area_m2;
   delete body.company;
   try{
-   const r=await fetch(location.href,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+   const r=await fetch('https://cretwntzhnfzypujqlid.supabase.co/functions/v1/patialan-app',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
    const j=await r.json();
    if(!r.ok) throw new Error(j.error||'Gönderilemedi');
    status.textContent='✓ Ön kaydın alındı.'; form.reset();
