@@ -161,6 +161,24 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
+
+      if (body.action === "event") {
+        const allowed = new Set(["page_view", "cta_click", "form_submit_success", "form_submit_error"]);
+        const eventName = String(body.event_name ?? "");
+        const kind = body.kind === "host" ? "host" : body.kind === "guest" ? "guest" : null;
+        if (!allowed.has(eventName)) {
+          return new Response(JSON.stringify({ error: "invalid_event" }), {
+            status: 400,
+            headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+          });
+        }
+        await admin.from("pilot_events").insert({ event_name: eventName, kind, source: "github_pages" });
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 201,
+          headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
       if (body.company) {
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
@@ -174,9 +192,10 @@ Deno.serve(async (req: Request) => {
       const phone = String(body.phone ?? "").trim().slice(0, 40) || null;
       const district = String(body.district ?? "").trim().slice(0, 100) || null;
       const areaM2 = body.area_m2 == null ? null : Number(body.area_m2);
+      const consent = body.consent === true;
 
-      if (!kind || name.length < 2 || !email.includes("@")) {
-        return new Response(JSON.stringify({ error: "Geçersiz form." }), {
+      if (!kind || name.length < 2 || !email.includes("@") || !consent) {
+        return new Response(JSON.stringify({ error: "Geçersiz form veya onay eksik." }), {
           status: 400,
           headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
         });
@@ -196,7 +215,9 @@ Deno.serve(async (req: Request) => {
         phone,
         district,
         area_m2: areaM2,
-        source: "edge_pilot",
+        source: "github_pages",
+        consent_at: new Date().toISOString(),
+        privacy_version: "pilot-v1",
       });
 
       if (error) {
@@ -207,6 +228,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      await admin.from("pilot_events").insert({ event_name: "form_submit_success", kind, source: "github_pages" });
       return new Response(JSON.stringify({ ok: true }), {
         status: 201,
         headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
